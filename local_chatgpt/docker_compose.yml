@@ -1,0 +1,46 @@
+version: "3.9"
+services:
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama:/root/.ollama
+    # Uncomment below if you have NVIDIA GPU
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      retries: 10
+      start_period: 30s
+
+  chainlit:
+    image: python:3.11
+    container_name: chainlit_app
+    working_dir: /app
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    depends_on:
+      ollama:
+        condition: service_healthy
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+    command: >
+      bash -c "
+      pip install pydantic==2.10.1 chainlit ollama &&
+      python -c 'import ollama; ollama.pull(\"gemma3:4b\")' &&
+      chainlit run app.py -w --host 0.0.0.0 --port 8000
+      "
+
+volumes:
+  ollama:
